@@ -1,42 +1,160 @@
 #pragma once
 
+#include "ollamaservice.h"
+
 #include <atomic>
 #include <blockingconcurrentqueue.h>
 #include <condition_variable>
 #include <thread>
 #include <nap/device.h>
 
+// Forward declarations
+namespace ollama
+{
+    class response;
+}
+
 namespace nap
 {
-    class NAPAPI OllamaChat : public Device
+    /**
+     * OllamaChat is a device that maintains a conversation with the Ollama AI.
+     * OllamaChat will fail to start if Ollama server is not running or if the model is not found.
+     */
+    class NAPAPI OllamaChat final : public Device
     {
+        friend class OllamaService;
+
     RTTI_ENABLE(Device)
     public:
-        bool start(utility::ErrorState& errorState) override;
+        /**
+         * Constructor
+         * @param service reference to the Ollama service
+         */
+        OllamaChat(OllamaService& service);
 
-        void stop() override;
+        /**
+         * Destructor
+         */
+        virtual ~OllamaChat();
 
+        /**
+         * Generate a prompt with the given message
+         * The callback will get called by each given token in the response
+         * All callbacks are executed on the main thread
+         * @param message the message to prompt
+         * @param callback the callback that gets called for each token in the response
+         * @param onComplete the callback that gets called when the response is complete
+         * @param onError the callback that gets called on error
+         */
         void chat(const std::string& message,
                   const std::function<void(const std::string&)>& callback,
-                  const std::function<void()>& onComplete);
+                  const std::function<void()>& onComplete,
+                  const std::function<void(const std::string&)>& onError);
 
-        void stopChat();
+        /**
+         * Generate a prompt with the given message
+         * The callback will get called by each given token in the response
+         * All callbacks are executed on the worker thread
+         * @param message the message to prompt
+         * @param callback the callback that gets called for each token in the response
+         * @param onComplete the callback that gets called when the response is complete
+         * @param onError the callback that gets called on error
+         */
+        void chatAsync(const std::string& message,
+                       const std::function<void(const std::string&)>& callback,
+                       const std::function<void()>& onComplete,
+                       const std::function<void(const std::string&)>& onError);
+
+        /**
+         * Clear the context for the next chat message
+         */
+        void clearContext();
+
+        /**
+         * Stop current response
+         */
+        void stopResponse();
 
         // properties :
-        std::string mModel = "deepseek-r1:14b";
-        std::string mServerURL = "http://localhost:11434";
+        std::string mModelSetting = "deepseek-r1:14b"; ///< Property : 'Model' The model to use for the chat
+        std::string mServerURLSetting = "http://localhost:11434"; ///< Property : 'ServerURL' The URL of the Ollama server
+    protected:
+        /**
+         * Starts the OllamaChat device, start worker thread, checks if model is available and if server is running
+         * @param errorState contains the error message on failure
+         * @return true on success
+         */
+        bool start(utility::ErrorState& errorState) final;
+
+        /**
+         * Stops the OllamaChat device, stops worker thread
+         */
+        void stop() final;
     private:
+        /**
+         * Updates the OllamaChat device, called on main thread from OllamaService
+         */
+        void update();
+
+        // worker thread that handles the chat
         std::thread mWorkerThread;
-        std::atomic_bool mRunning = true;
         void onWork();
 
-        std::atomic_bool mResponding = false;
+        /**
+         * Sets the context for the next chat message
+         * @param context
+         */
+        void setContext(const std::string& context);
 
+        /**
+         * Sets the context for the next chat message
+         * @param context
+         */
+        void setContext(const ollama::response& context);
+
+        /**
+         * Gets the context for the next chat message
+         * @return the context
+         */
+        ollama::response getContext();
+
+        /**
+         * Enqueues a task to be executed on the worker thread
+         * @param task the task to execute
+         */
+        void enqueueTask(const std::function<void()>& task);
+
+        // mutex for the context
+        std::mutex mContextMutex;
+
+        // atomic bool indicating if the worker thread is currently streaming a response
+        std::atomic_bool mStreaming = false;
+
+        // atomic bool indicating if the worker thread is running
+        std::atomic_bool mRunning = true;
+
+        // mutex for the task queue that are executed on the worker thread
+        std::mutex mTaskQueueMutex;
+
+        // task queue that are executed on the worker thread
+        std::vector<std::function<void()>> mWorkerThreadTaskQueue;
+
+        // condition variable to signal the worker thread to continue
+        std::condition_variable mSignalWorkerThreadContinue;
+
+        // pimpl ollama implementation defined in ollamachat.cpp
         struct Impl;
         std::unique_ptr<Impl> mImpl;
 
-        std::mutex mTaskQueueMutex;
-        std::condition_variable mSignalWorkerThreadContinue;
-        std::vector<std::function<void()>> mTaskQueue;
+        // service that manages the OllamaChat device
+        OllamaService& mService;
+
+        // queue of tasks to execute on the main thread
+        moodycamel::ConcurrentQueue<std::function<void()>> mMainThreadTaskQueue;
+
+        std::string mModel; ///< The model to use for the chat
+        std::string mServerURL; ///< The URL of the Ollama server
     };
+
+    using OllamaChatObjectCreator = rtti::ObjectCreator<OllamaChat, OllamaService>;
 }

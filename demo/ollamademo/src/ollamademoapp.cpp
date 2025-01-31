@@ -63,14 +63,11 @@ namespace nap
 
 	void ollamademoApp::onResponse(const std::string& response)
 	{
-		mTaskQueue.enqueue([this, response]()
-		{
-			std::string answer = mAnswer + response;
-			if (ImGui::CalcTextSize(answer.c_str()).x > 880)
-				mAnswer += "\n" + response;
-			else
-				mAnswer = answer;
-		});
+        std::string answer = mAnswer + response;
+        if (ImGui::CalcTextSize(answer.c_str()).x > 880)
+            mAnswer += "\n" + response;
+        else
+            mAnswer = answer;
 	}
 
 
@@ -82,12 +79,6 @@ namespace nap
 	// Update app
 	void ollamademoApp::update(double deltaTime)
 	{
-		std::function<void()> task;
-		while (mTaskQueue.try_dequeue(task))
-		{
-			task();
-		}
-
 		// Use a default input router to forward input events (recursively) to all input components in the default scene
 		nap::DefaultInputRouter input_router(true);
 		mInputService->processWindowEvents(*mRenderWindow, input_router, { &mScene->getRootEntity() });
@@ -106,9 +97,10 @@ namespace nap
 			{
 				mResponseComplete = false;
 				mAnswer = "";
-				mOllamaChat->chat(mQuestion,
-								  [this](const std::string& response){ onResponse(response); },
-								  [this](){ onComplete(); });
+                mOllamaChat->chat(mQuestion,
+                                  [this](const std::string &response){ onResponse(response); },
+                                  [this](){ onComplete(); },
+                                  [this](const std::string &error){ nap::Logger::error("Error: %s", error.c_str()); onComplete(); });
 			}
 
 			if (disabled)
@@ -128,7 +120,7 @@ namespace nap
 			ImGui::SameLine();
 			if (ImGui::Button("Stop"))
 			{
-				mOllamaChat->stopChat();
+                mOllamaChat->stopResponse();
 			}
 
 			if (disabled)

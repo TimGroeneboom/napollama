@@ -1,8 +1,8 @@
 {
     "Type": "nap::ModuleInfo", 
-    "mID": "ModuleInfo", 
+    "mID": "ModuleInfo",
     "RequiredModules": [
-        
-    ], 
+    ],
+    "DemoApp" : "ollamademo",
     "WindowsDllSearchPaths": []
 }

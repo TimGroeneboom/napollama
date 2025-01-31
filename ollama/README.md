@@ -50,10 +50,10 @@ The test cases do a good job of providing discrete examples for each of the API 
     - [Asynchronous Streaming Generation](#asynchronous-streaming-generation)
     - [Using Images](#using-images)
     - [Generation using Images](#generation-using-images)
-    - [Basic Chat Generation](#basic-chat-generation)
-    - [Chat with Multiple Messages](#chat-with-multiple-messages)
-    - [Streaming Chat Generation](#streaming-chat-generation)
-    - [Chat with Images](#chat-with-images)
+    - [Basic Chat Generation](#basic-chatAsync-generation)
+    - [Chat with Multiple Messages](#chatAsync-with-multiple-messages)
+    - [Streaming Chat Generation](#streaming-chatAsync-generation)
+    - [Chat with Images](#chatAsync-with-images)
     - [Embedding Generation](#embedding-generation)
     - [Debug Information](#debug-information)
     - [Manual Requests](#manual-requests)
@@ -92,7 +92,7 @@ nlohmann::json data = response.as_json();
 // A string representing the JSON data received
 std::string json_string = response.as_json_string();
 
-// Usually contains just the human-readable response from the generation/chat
+// Usually contains just the human-readable response from the generation/chatAsync
 std::string simple_string = response.as_simple_string();
 ```
 
@@ -307,9 +307,9 @@ ollama::response response =
 ```
 
 ### Basic Chat Generation
-The Ollama chat API can be used as an alternative to basic generation. This allows the user to send a series of messages to the server and obtain the next response in the conversation.
+The Ollama chatAsync API can be used as an alternative to basic generation. This allows the user to send a series of messages to the server and obtain the next response in the conversation.
 
-`ollama::message` represents a single chat message in the conversation. It is composed of a role, content, and an optional series of images.
+`ollama::message` represents a single chatAsync message in the conversation. It is composed of a role, content, and an optional series of images.
 
 ```C++
 ollama::message message("user", "Why is the sky blue?");
@@ -319,10 +319,10 @@ Sending a message to the server will return the next message in the conversation
 ```C++
 ollama::message message("user", "Why is the sky blue?");
 
-ollama::response response = ollama::chat("llama3:8b", message);
+ollama::response response = ollama::chatAsync("llama3:8b", message);
 ```
 
-Like any generative call, chat calls can also include options.
+Like any generative call, chatAsync calls can also include options.
 
 ```C++
 ollama::options options;
@@ -330,12 +330,12 @@ options["seed"] = 1;
 
 ollama::message message("user", "Why is the sky blue?");
 
-ollama::response response = ollama::chat("llama3:8b", message, options);
+ollama::response response = ollama::chatAsync("llama3:8b", message, options);
 ```
 
 ### Chat with Multiple Messages
 
-You can use a collection of messages in a chat. This allows chain-of-thought prompting and can be useful for setting up a conversation.
+You can use a collection of messages in a chatAsync. This allows chain-of-thought prompting and can be useful for setting up a conversation.
 
 ```C++
 ollama::message message1("user", "What are nimbus clouds?");
@@ -344,11 +344,11 @@ ollama::message message3("user", "What are some other kinds of clouds?");
 
 ollama::messages messages = {message1, message2, message3};
 
-ollama::response response = ollama::chat("llama3:8b", messages);
+ollama::response response = ollama::chatAsync("llama3:8b", messages);
 ```
 
 ### Streaming Chat Generation
-The default chat generation does not stream tokens and will return the entire reply as one response. You can bind a callback function to handle a streamed response for each token, just like a standard generation.
+The default chatAsync generation does not stream tokens and will return the entire reply as one response. You can bind a callback function to handle a streamed response for each token, just like a standard generation.
 
 ```C++
 
@@ -363,11 +363,11 @@ std::function<void(const ollama::response&)> response_callback = on_receive_resp
 
 ollama::message message("user", "Why is the sky blue?");       
 
-ollama::chat("llama3:8b", message, response_callback, options);
+ollama::chatAsync("llama3:8b", message, response_callback, options);
 ```
 
 ### Chat with Images
-The `ollama::message` class can contain an arbitrary number of `ollama::image` objects to be sent to the server. This allows images to be sent in each message of a chat for vision-enabled models. 
+The `ollama::message` class can contain an arbitrary number of `ollama::image` objects to be sent to the server. This allows images to be sent in each message of a chatAsync for vision-enabled models. 
 
 ```C++
 ollama::image image = ollama::image::from_file("llama.jpg");
@@ -375,7 +375,7 @@ ollama::image image = ollama::image::from_file("llama.jpg");
 // We can optionally include images with each message. 
 //Vision-enabled models will be able to utilize these.
 ollama::message message_with_image("user", "What do you see in this image?", image);
-ollama::response response = ollama::chat("llava", message_with_image);
+ollama::response response = ollama::chatAsync("llava", message_with_image);
 ```
 ### Embedding Generation
 Embeddings can be generated from a specified model name and prompt.
@@ -412,7 +412,7 @@ request["prompt"]="Why is the sky blue?";
 request["system"] = "Talk like a pirate for the next reply."
 std::cout << ollama::generate(request) << std::endl;
 ```
-This provides the most customization of the request. Users should take care to ensure that valid fields are provided, otherwise an exception will likely be thrown on response. Manual requests can be made for generate, chat, and embedding endpoints.
+This provides the most customization of the request. Users should take care to ensure that valid fields are provided, otherwise an exception will likely be thrown on response. Manual requests can be made for generate, chatAsync, and embedding endpoints.
 
 ### Handling Context
 Context from previous generate requests can be used by including a past `ollama::response` with `generate`:
@@ -442,7 +442,7 @@ request["context"] = response.as_json()["context"];
 std::cout << ollama::generate(request) << std::endl;
 ```
 
-Note that the `chat` endpoint has no specialized context parameter; context is simply supplied through the message history of the conversation:
+Note that the `chatAsync` endpoint has no specialized context parameter; context is simply supplied through the message history of the conversation:
 
 ```C++
 ollama::message message1("user", "What are nimbus clouds?");
@@ -451,7 +451,7 @@ ollama::message message3("user", "What was the first question I asked you?");
 
 ollama::messages messages = {message1, message2, message3};
 
-std::cout << ollama::chat("llama3.1:8b", messages) << std::endl;
+std::cout << ollama::chatAsync("llama3.1:8b", messages) << std::endl;
 ```
 ### Context Length
 Most language models have a maximum input context length that they can accept. This length determines the number of previous tokens that can be provided along with the prompt as an input to the model before information is lost. Llama 3.1, for example, has a maximum context length of 128k tokens; a much smaller number of <b>2048</b> tokens is often enabled by default from Ollama in order to reduce memory usage. You can increase the size of the context window using the `num_ctx` parameter in `ollama::options` for tasks where you need to retain a long conversation history:

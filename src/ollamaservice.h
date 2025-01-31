@@ -5,12 +5,20 @@
 
 namespace nap
 {
-	class NAPAPI ollamaService : public Service
+    // Forward declarations
+    class OllamaChat;
+
+    /**
+     * OllamaService is a service that manages OllamaChat devices
+     */
+	class NAPAPI OllamaService : public Service
 	{
+        friend class OllamaChat;
+
 		RTTI_ENABLE(Service)
 	public:
 		// Default Constructor
-		ollamaService(ServiceConfiguration* configuration) : Service(configuration)	{ }
+		OllamaService(ServiceConfiguration* configuration) : Service(configuration)	{ }
 
 		/**
 		 * Use this call to register service dependencies
@@ -42,5 +50,21 @@ namespace nap
 		 */
 		virtual void shutdown() override;
 
+        void registerObjectCreators(rtti::Factory &factory) override;
+    private:
+        /**
+         * Registers a chat device
+         * @param chat the chat device to register
+         */
+        void registerChat(OllamaChat& chat);
+
+        /**
+         * Removes a chat device
+         * @param chat the chat device to remove
+         */
+        void removeChat(OllamaChat& chat);
+
+        // List of registered chat devices
+        std::vector<OllamaChat*> mChats;
 	};
 }

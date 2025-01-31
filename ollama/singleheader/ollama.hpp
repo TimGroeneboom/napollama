@@ -35273,7 +35273,7 @@ class Ollama
         std::string request_string = request.dump();
         if (ollama::log_requests) std::cout << request_string << std::endl;      
 
-        if (auto res = this->cli->Post("/api/chat",request_string, "application/json"))
+        if (auto res = this->cli->Post("/api/chatAsync",request_string, "application/json"))
         {
             if (ollama::log_replies) std::cout << res->body << std::endl;
 
@@ -35325,7 +35325,7 @@ class Ollama
             return true;
         };
 
-        if (auto res = this->cli->Post("/api/chat", request_string, "application/json", stream_callback)) { return true; }
+        if (auto res = this->cli->Post("/api/chatAsync", request_string, "application/json", stream_callback)) { return true; }
         else { if (ollama::use_exceptions) throw ollama::exception( "No response from server returned at URL"+this->server_url+" Error: "+httplib::to_string( res.error() ) ); }
 
         return false;
