@@ -93,6 +93,9 @@ namespace nap
          */
         void stop() final;
     private:
+        // Task type, shorthand for a function that takes no arguments and returns void
+        using Task = std::function<void()>;
+
         /**
          * Generate a prompt with the given message
          * The callback will get called by each given token in the response
@@ -139,13 +142,13 @@ namespace nap
          * Enqueues a task to be executed on the worker thread
          * @param task the task to execute
          */
-        void enqueueWorkerTask(const std::function<void()>& task);
+        void enqueueWorkerTask(const Task& task);
 
         /**
          * Enqueues a task to be executed on the main thread called from update() from OllamaService
          * @param task the task to execute
          */
-        void enqueueMainThreadTask(const std::function<void()>& task);
+        void enqueueMainThreadTask(const Task& task);
 
         // mutex for the context
         std::mutex mContextMutex;
@@ -160,7 +163,7 @@ namespace nap
         std::mutex mTaskQueueMutex;
 
         // task queue that are executed on the worker thread
-        std::vector<std::function<void()>> mWorkerThreadTaskQueue;
+        std::vector<Task> mWorkerThreadTaskQueue;
 
         // condition variable to signal the worker thread to continue
         std::condition_variable mSignalWorkerThreadContinue;
@@ -173,7 +176,7 @@ namespace nap
         OllamaService& mService;
 
         // queue of tasks to execute on the main thread
-        moodycamel::ConcurrentQueue<std::function<void()>> mMainThreadTaskQueue;
+        moodycamel::ConcurrentQueue<Task> mMainThreadTaskQueue;
 
         std::string mModel; ///< The model to use for the chat
         std::string mServerURL; ///< The URL of the Ollama server

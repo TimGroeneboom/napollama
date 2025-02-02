@@ -91,7 +91,7 @@ namespace nap
         // Execute tasks on the main thread queued
         if(mMainThreadTaskQueue.size_approx() > 0)
         {
-            std::function<void()> task;
+            Task task;
             while (mMainThreadTaskQueue.try_dequeue(task))
                 task();
         }
@@ -229,7 +229,7 @@ namespace nap
         while (mRunning)
         {
             // Swap the task queue to avoid locking the mutex for too long
-            std::vector<std::function<void()>> task_queue;
+            std::vector<Task> task_queue;
             {
                 std::unique_lock lock(mTaskQueueMutex);
                 task_queue.swap(mWorkerThreadTaskQueue);
@@ -253,7 +253,7 @@ namespace nap
     }
 
 
-    void OllamaChat::enqueueWorkerTask(const std::function<void()>& task)
+    void OllamaChat::enqueueWorkerTask(const Task& task)
     {
         // Enqueue the task to be executed on worker thread
         {
@@ -266,7 +266,7 @@ namespace nap
     }
 
 
-    void OllamaChat::enqueueMainThreadTask(const std::function<void()>& task)
+    void OllamaChat::enqueueMainThreadTask(const Task& task)
     {
         // Enqueue the task to be executed on the main thread
         mMainThreadTaskQueue.enqueue(task);
