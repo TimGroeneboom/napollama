@@ -88,14 +88,12 @@ namespace nap
 
     void OllamaChat::update()
     {
-        // Execute tasks on the main thread queued by the worker thread
+        // Execute tasks on the main thread queued
         if(mMainThreadTaskQueue.size_approx() > 0)
         {
             std::function<void()> task;
             while (mMainThreadTaskQueue.try_dequeue(task))
-            {
                 task();
-            }
         }
     }
 
@@ -112,102 +110,89 @@ namespace nap
     }
 
 
-    void OllamaChat::chat(const std::string &message, const std::function<void(const std::string &)> &callback,
-                          const std::function<void()> &onComplete,
-                          const std::function<void(const std::string &)> &onError)
-    {
-        // Create a task to be executed by the worker thread
-        std::function function([this, message, callback, onComplete, onError]()
-        {
-            try
-            {
-               // The ollama server is responding
-               mStreaming = true;
-
-               // Get the current context
-               ollama::response context = getContext();
-
-               // Prompt the server to generate a response,
-               // callback handles the responses (response is one token at a time)
-               mImpl->mServer->generate(mModel,
-                                        message,
-                                        context,
-                                        [this, callback, onComplete](const ollama::response& response)
-               {
-                    // The last response is the context for the next prompt
-                    setContext(response);
-
-                    // Call the callback with the response on the main thread
-                    std::string response_str = response;
-                    mMainThreadTaskQueue.enqueue([response_str, callback](){ callback(response_str); });
-
-                    // If the response is done, call the onComplete callback
-                    if (response.as_json()["done"]==true)
-                    {
-                        mMainThreadTaskQueue.enqueue([onComplete]() { onComplete(); });
-                        mStreaming = false;
-                    }
-                });
-            }catch (const std::exception& exception)
-            {
-               // Call onError callback on error
-                std::string error = exception.what();
-                mStreaming = false;
-                mMainThreadTaskQueue.enqueue([onError, error](){ onError(error); });
-            }
-        });
-
-        enqueueTask(function);
-    }
-
-
     void OllamaChat::chatAsync(const std::string& message,
                                const std::function<void(const std::string&)>& callback,
                                const std::function<void()>& onComplete,
                                const std::function<void(const std::string&)>& onError)
     {
-        // Create a task to be executed by the worker thread
-        std::function function([this, message, callback, onComplete, onError]()
+        // Enqueue the chat blocking task to be executed by the worker thread
+        enqueueWorkerTask([this, message, callback, onComplete, onError]()
+                          {
+                              chatBlocking(message, callback, onComplete, onError);
+                          });
+    }
+
+
+    void OllamaChat::chat(const std::string &message, const std::function<void(const std::string &)> &callback,
+                          const std::function<void()> &onComplete,
+                          const std::function<void(const std::string &)> &onError)
+    {
+        enqueueWorkerTask([this, message, callback, onComplete, onError]()
+                          {
+                              chatBlocking(message,
+                                           [this, callback](const std::string &response)
+                                           {
+                                               // Execute the callback on the main thread
+                                               enqueueMainThreadTask([callback, response]()
+                                                                     { callback(response); });
+                                           },
+                                           [this, onComplete]()
+                                           {
+                                               // Execute the onComplete callback on the main thread
+                                               enqueueMainThreadTask(onComplete);
+                                           },
+                                           [this, onError](const std::string &error)
+                                           {
+                                               // Execute the onError callback on the main thread
+                                               enqueueMainThreadTask([onError, error]()
+                                                                     { onError(error); });
+                                           });
+                          });
+    }
+
+
+    void OllamaChat::chatBlocking(const std::string &message,
+                                  const std::function<void(const std::string &)> &callback,
+                                  const std::function<void()> &onComplete,
+                                  const std::function<void(const std::string &)> &onError)
+    {
+        try
         {
-            try
-            {
-                // The ollama server is responding
-                mStreaming = true;
+            // The ollama server is responding
+            mStreaming = true;
 
-                // Get the current context
-                ollama::response context = getContext();
+            // Get the current context
+            ollama::response context = getContext();
 
-                // Prompt the server to generate a response,
-                // callback handles the responses (response is one token at a time)
-                mImpl->mServer->generate(mModel,
-                                         message,
-                                         context,
-                                         [this, callback, onComplete](const ollama::response& response)
-                {
-                    // The last response is the context for the next prompt
-                    setContext(response);
+            // Prompt the server to generate a response,
+            // callback handles the responses (response is one token at a time)
+            // this function will block until the response is complete
+            mImpl->mServer->generate(mModel,
+                                     message,
+                                     context,
+                                    [this, callback, onComplete](const ollama::response& response)
+                                    {
+                                        // The last response is the context for the next prompt
+                                        setContext(response);
 
-                    // Call the callback with the response
-                    std::string response_str = response;
-                    callback(response_str);
+                                        // Call the callback with the response
+                                        std::string response_str = response;
+                                        callback(response_str);
 
-                    // If the response is done, call the onComplete callback
-                    if (response.as_json()["done"]==true)
-                    {
-                        onComplete();
-                        mStreaming = false;
-                    }
-                });
-            }catch (const std::exception& exception)
-            {
-                // Call onError callback on error
-                std::string error = exception.what();
-                mStreaming = false;
-                onError(error);
-            }
-        });
-
-        enqueueTask(function);
+                                        // If the response is done, call the onComplete callback
+                                        if (response.as_json()["done"]==true)
+                                        {
+                                            onComplete();
+                                            mStreaming = false;
+                                        }
+                                    });
+        }catch (const std::exception& exception)
+        {
+            // Call onError callback on error
+            std::string error = exception.what();
+            mStreaming = false;
+            onError(error);
+        }
     }
 
 
@@ -263,12 +248,12 @@ namespace nap
             // Wait for more tasks
             std::unique_lock lock(mTaskQueueMutex);
             if (mWorkerThreadTaskQueue.empty())
-                mSignalWorkerThreadContinue.wait(lock, []{ return true; });
+                mSignalWorkerThreadContinue.wait(lock, [this]{ return !mWorkerThreadTaskQueue.empty() || !mRunning; });
         }
     }
 
 
-    void OllamaChat::enqueueTask(const std::function<void()>& task)
+    void OllamaChat::enqueueWorkerTask(const std::function<void()>& task)
     {
         // Enqueue the task to be executed on worker thread
         {
@@ -278,5 +263,12 @@ namespace nap
 
         // Notify the worker thread to continue
         mSignalWorkerThreadContinue.notify_one();
+    }
+
+
+    void OllamaChat::enqueueMainThreadTask(const std::function<void()>& task)
+    {
+        // Enqueue the task to be executed on the main thread
+        mMainThreadTaskQueue.enqueue(task);
     }
 }

@@ -40,7 +40,7 @@ namespace nap
         /**
          * Generate a prompt with the given message
          * The callback will get called by each given token in the response
-         * All callbacks are executed on the main thread
+         * All callbacks are executed on the calling thread
          * @param message the message to prompt
          * @param callback the callback that gets called for each token in the response
          * @param onComplete the callback that gets called when the response is complete
@@ -72,6 +72,8 @@ namespace nap
 
         /**
          * Stop current response
+         * This will close the http connection to the server effectively stopping the response
+         * This call is thread safe
          */
         void stopResponse();
 
@@ -91,6 +93,21 @@ namespace nap
          */
         void stop() final;
     private:
+        /**
+         * Generate a prompt with the given message
+         * The callback will get called by each given token in the response
+         * All callbacks are executed on the calling thread
+         * This call will block until the response is complete
+         * @param message the message to prompt
+         * @param callback the callback that gets called for each token in the response
+         * @param onComplete the callback that gets called when the response is complete
+         * @param onError the callback that gets called on error
+         */
+        void chatBlocking(const std::string& message,
+                          const std::function<void(const std::string&)>& callback,
+                          const std::function<void()>& onComplete,
+                          const std::function<void(const std::string&)>& onError);
+
         /**
          * Updates the OllamaChat device, called on main thread from OllamaService
          */
@@ -122,7 +139,13 @@ namespace nap
          * Enqueues a task to be executed on the worker thread
          * @param task the task to execute
          */
-        void enqueueTask(const std::function<void()>& task);
+        void enqueueWorkerTask(const std::function<void()>& task);
+
+        /**
+         * Enqueues a task to be executed on the main thread called from update() from OllamaService
+         * @param task the task to execute
+         */
+        void enqueueMainThreadTask(const std::function<void()>& task);
 
         // mutex for the context
         std::mutex mContextMutex;
