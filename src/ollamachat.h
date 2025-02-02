@@ -40,7 +40,7 @@ namespace nap
         /**
          * Generate a prompt with the given message
          * The callback will get called by each given token in the response
-         * All callbacks are executed on the calling thread
+         * All callbacks are executed on the main thread, called from update() in OllamaService
          * @param message the message to prompt
          * @param callback the callback that gets called for each token in the response
          * @param onComplete the callback that gets called when the response is complete
@@ -67,6 +67,7 @@ namespace nap
 
         /**
          * Clear the context for the next chat message
+         * This call is thread safe
          */
         void clearContext();
 
@@ -175,7 +176,7 @@ namespace nap
         // service that manages the OllamaChat device
         OllamaService& mService;
 
-        // queue of tasks to execute on the main thread
+        // concurrent lockless queue of tasks to be executed from the main thread
         moodycamel::ConcurrentQueue<Task> mMainThreadTaskQueue;
 
         std::string mModel; ///< The model to use for the chat
