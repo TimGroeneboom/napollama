@@ -52,7 +52,6 @@ namespace nap
         auto it = std::find_if(models.begin(), models.end(), [this](const std::string& model) { return model == mModel; });
         if (!errorState.check(it != models.end(), utility::stringFormat("%s model not found!", mModel.c_str())))
         {
-            mImpl->mServer->list_models();
             nap::Logger::info("Models found : ");
             for (const auto& model : models)
             {
