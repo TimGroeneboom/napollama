@@ -15,8 +15,14 @@ namespace nap
     /**
      * OllamaChat implementation
      */
-    struct OllamaChat::Impl
+    class OllamaChat::Impl
     {
+    public:
+        Impl()
+        {
+            mServer = std::make_unique<Ollama>();
+        }
+
         // Ollama server
         std::unique_ptr<Ollama> mServer;
 
@@ -41,7 +47,6 @@ namespace nap
 
         // Create the ollama server
         mImpl = std::make_unique<Impl>();
-        mImpl->mServer = std::make_unique<Ollama>(mServerURL);
 
         // check if server is running
         if (!errorState.check(mImpl->mServer->is_running(), "Ollama server is not running!"))

@@ -85,10 +85,13 @@ namespace nap
 
 		std::string mQuestion = "What is the meaning of life?";		///< The question to ask the Ollama
 		std::string mAnswer;										///< The answer from the Ollama
+		moodycamel::ConcurrentQueue<std::function<void()>> mTaskQueue;	///< Queue of tasks to execute
 
 		std::atomic_bool mResponseComplete = true;				///< Flag to indicate if the response is complete
 		void onResponse(const std::string& response);
 
 		void onComplete();
+
+		void onError(const std::string& error);
 	};
 }

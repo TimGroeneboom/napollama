@@ -63,11 +63,14 @@ namespace nap
 
 	void ollamademoApp::onResponse(const std::string& response)
 	{
-        std::string answer = mAnswer + response;
-        if (ImGui::CalcTextSize(answer.c_str()).x > 880)
-            mAnswer += "\n" + response;
-        else
-            mAnswer = answer;
+		mTaskQueue.enqueue([this, response]()
+		{
+			std::string answer = mAnswer + response;
+			if (ImGui::CalcTextSize(answer.c_str()).x > 880)
+				mAnswer += "\n" + response;
+			else
+				mAnswer = answer;
+		});
 	}
 
 
@@ -75,10 +78,24 @@ namespace nap
 	{
 		mResponseComplete = true;
 	}
-	
+
+
+	void ollamademoApp::onError(const std::string& error)
+	{
+		nap::Logger::error("Error: %s", error.c_str());
+		mResponseComplete = true;
+	}
+
+
 	// Update app
 	void ollamademoApp::update(double deltaTime)
 	{
+		std::function<void()> task;
+		while (mTaskQueue.try_dequeue(task))
+		{
+			task();
+		}
+
 		// Use a default input router to forward input events (recursively) to all input components in the default scene
 		nap::DefaultInputRouter input_router(true);
 		mInputService->processWindowEvents(*mRenderWindow, input_router, { &mScene->getRootEntity() });
@@ -97,10 +114,10 @@ namespace nap
 			{
 				mResponseComplete = false;
 				mAnswer = "";
-                mOllamaChat->chat(mQuestion,
-                                  [this](const std::string &response){ onResponse(response); },
-                                  [this](){ onComplete(); },
-                                  [this](const std::string &error){ nap::Logger::error("Error: %s", error.c_str()); onComplete(); });
+				mOllamaChat->chat(mQuestion,
+								  [this](const std::string& response){ onResponse(response); },
+								  [this](){ onComplete(); },
+								  [this](const std::string& error){ onError(error); });
 			}
 
 			if (disabled)
@@ -120,7 +137,7 @@ namespace nap
 			ImGui::SameLine();
 			if (ImGui::Button("Stop"))
 			{
-                mOllamaChat->stopResponse();
+				mOllamaChat->stopResponse();
 			}
 
 			if (disabled)

@@ -17,7 +17,7 @@ namespace ollama
 namespace nap
 {
     /**
-     * OllamaChat is a device that maintains a conversation with the Ollama AI.
+     * OllamaChat is a device that maintains one conversation with the Ollama AI.
      * OllamaChat will fail to start if Ollama server is not running or if the model is not found.
      */
     class NAPAPI OllamaChat final : public Device
@@ -170,7 +170,7 @@ namespace nap
         std::condition_variable mSignalWorkerThreadContinue;
 
         // pimpl ollama implementation defined in ollamachat.cpp
-        struct Impl;
+        class Impl;
         std::unique_ptr<Impl> mImpl;
 
         // service that manages the OllamaChat device
